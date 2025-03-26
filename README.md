@@ -182,8 +182,7 @@ Compte Pusher pour la configuration
    ```sh
    php artisan serve
    ```
-3. Ouvrir `http://127.0.0.1:8000` dans le navigateur.
-4.Ouvrir `index.html` dans le navigateur pour manipuler le suivi des stocks
+3. Ouvrir `http://127.0.0.1:8000` dans le navigateur et ouvrir `index.html` dans le navigateur pour manipuler le suivi des stocks
 
 ## Conclusion
 Cette application fournit une solution efficace pour le suivi des stocks en temps réel en utilisant Laravel, Pusher et Highcharts. Grâce à WebSockets, les utilisateurs peuvent visualiser instantanément les changements de stock sans avoir besoin de recharger la page. Cette approche moderne garantit une gestion fluide et interactive des produits, rendant l'expérience utilisateur plus dynamique et intuitive.
