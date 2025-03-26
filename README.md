@@ -1,66 +1,202 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Suivi des Stocks en Temps Réel
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+## Description
+Cette application permet le suivi des stocks en temps réel où plusieurs utilisateurs peuvent voir les mises à jour instantanément via WebSockets. Les données sont affichées sous forme de graphique grâce à Highcharts.
 
-## About Laravel
+## Technologies Utilisées
+- Laravel
+- Laravel WebSockets
+- Pusher
+- Highcharts
+- Bootstrap
+- JavaScript
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Installation
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### Prérequis
+- PHP 8+
+- Composer
+- Node.js
+- Laravel installé
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Étapes d'installation
+1. Cloner le dépôt :
+   ```sh
+   git clone https://github.com/Lorraine301/Atelier5_Exercice4_Suivi_des_stocks.git
+   cd Atelier5_Exercice4_Suivi_des_stocks
+   ```
+2. Installer les dépendances :
+   ```sh
+   composer install
+   npm install
+   ```
+3. Configurer l'environnement :
+   - Voir le fichier  `.env`
+   - Modifier les informations de connexion à la base de données
+   - Ajouter les clés Pusher :
+     ```env
+     PUSHER_APP_ID=1964345
+     PUSHER_APP_KEY=4a1b7839de7fac80b836
+     PUSHER_APP_SECRET=03f84e7d8a626d9ec225
+     PUSHER_APP_CLUSTER=mt1
+     ```
 
-## Learning Laravel
+4. Exécuter les migrations :
+   ```sh
+   php artisan migrate
+   ```
+5. Démarrer Laravel WebSockets :
+   ```sh
+   php artisan websockets:serve
+   ```
+7. Lancer le serveur Laravel :
+   ```sh
+   php artisan serve
+   ```
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Explication du Code
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+### Modèle Stock
+```php
+namespace App\Models;
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+use Illuminate\Database\Eloquent\Model;
 
-## Laravel Sponsors
+class Stock extends Model
+{
+    protected $fillable = ['product_name', 'quantity'];
+    protected $casts = [
+        'quantity' => 'integer'
+    ];
+}
+```
+- Définit la structure des stocks et les champs modifiables.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### Événement StockUpdated
+```php
+namespace App\Events;
 
-### Premium Partners
+use App\Models\Stock;
+use Illuminate\Broadcasting\Channel;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+class StockUpdated implements ShouldBroadcast
+{
+    public $stock;
 
-## Contributing
+    public function __construct(Stock $stock)
+    {
+        $this->stock = $stock;
+    }
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+    public function broadcastOn()
+    {
+        return new Channel('stocks');
+    }
+}
+```
+- Diffuse les mises à jour des stocks aux autres utilisateurs.
 
-## Code of Conduct
+### Contrôleur StockController
+```php
+namespace App\Http\Controllers;
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+use App\Events\StockUpdated;
+use App\Models\Stock;
+use Illuminate\Http\Request;
 
-## Security Vulnerabilities
+class StockController extends Controller
+{
+    public function index()
+    {
+        return response()->json(Stock::all());
+    }
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+    public function store(Request $request)
+    {
+        $stock = Stock::create($request->validate([
+            'product_name' => 'required|string|max:255',
+            'quantity' => 'required|integer|min:0'
+        ]));
+        broadcast(new StockUpdated($stock))->toOthers();
+        return response()->json($stock, 201);
+    }
 
-## License
+    public function update(Request $request, $id)
+    {
+        $stock = Stock::findOrFail($id);
+        $stock->update($request->validate(['quantity' => 'required|integer|min:0']));
+        broadcast(new StockUpdated($stock))->toOthers();
+        return response()->json($stock);
+    }
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+    public function destroy($id)
+    {
+        $stock = Stock::findOrFail($id);
+        $stock->delete();
+        broadcast(new StockUpdated($stock))->toOthers();
+        return response()->json(null, 204);
+    }
+}
+```
+- Implémente les actions CRUD et diffuse les mises à jour.
+
+### Routes API
+```php
+use App\Http\Controllers\StockController;
+
+Route::apiResource('stocks', StockController::class);
+```
+- Définit les routes pour gérer les stocks.
+
+## Interface Graphique
+L'application affiche un graphique des stocks avec Highcharts et propose des formulaires pour ajouter et supprimer des produits.
+
+Interface Principale
+![Interface Principale](images/interface.png)
+
+Ajout des produits
+
+![Graphique Highcharts](images/Ajout_produit.png)
+
+Graphe pour les stocks
+
+![Graphique Highcharts](images/graphe.png)
+
+Suppression des produits
+
+![Graphique Highcharts](images/suppression.png)
+
+Compte Pusher pour la configuration
+
+![Graphique Highcharts](images/pusher.png)
+
+
+
+## Lancement de l'Application
+1. Démarrer Laravel WebSockets :
+   ```sh
+   php artisan websockets:serve
+   ```
+2. Lancer le serveur Laravel :
+   ```sh
+   php artisan serve
+   ```
+3. Ouvrir `http://127.0.0.1:8000` dans le navigateur.
+4.Ouvrir `index.html` dans le navigateur pour manipuler le suivi des stocks
+
+## Conclusion
+Cette application fournit une solution efficace pour le suivi des stocks en temps réel en utilisant Laravel, Pusher et Highcharts. Grâce à WebSockets, les utilisateurs peuvent visualiser instantanément les changements de stock sans avoir besoin de recharger la page. Cette approche moderne garantit une gestion fluide et interactive des produits, rendant l'expérience utilisateur plus dynamique et intuitive.
+
+🔹 **Points forts de l'application** :
+- **Mises à jour en temps réel** avec Laravel WebSockets.
+- **Interface dynamique** et conviviale grâce à Highcharts et Bootstrap.
+- **Gestion complète des stocks** (ajout, modification, suppression).
+- **API RESTful** permettant une intégration facile avec d'autres services.
+
+
+## Auteur
+Lorraine301
+
+## Licence
+Cet exercice utilise la licence MIT
