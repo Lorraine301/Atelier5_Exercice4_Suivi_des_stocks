@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stock Tracking Dashboard</title>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/accessibility.js"></script>
+    <script src="https://js.pusher.com/7.2/pusher.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="mb-4 text-center">Suivi des stocks</h1>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Ajout des produits</div>
+                    <div class="card-body">
+                        <form id="addProductForm">
+                            <div class="mb-3">
+                                <label for="productName" class="form-label">Nom du produit</label>
+                                <input type="text" class="form-control" id="productName" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="quantity" class="form-label">Quantité</label>
+                                <input type="number" class="form-control" id="quantity" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Ajouter le produit</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Stock Chart</div>
+                    <div class="card-body">
+                        <div id="stockChart"></div>
+                    </div>
+                </div>
+                <div class="card mt-4">
+                    <div class="card-header">Suppresion des Produits</div>
+                    <div class="card-body">
+                        <form id="deleteProductForm">
+                            <div class="mb-3">
+                                <label for="deleteProductName" class="form-label">Nom du produit</label>
+                                <input type="text" class="form-control" id="deleteProductName" required>
+                            </div>
+                            <button type="submit" class="btn btn-danger">Supprimer le produit</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Pusher configuration
+        const pusher = new Pusher('4a1b7839de7fac80b836', {
+            cluster: 'mt1'
+        });
+
+        const channel = pusher.subscribe('stocks');
+        
+        // Highcharts configuration
+        let chart = Highcharts.chart('stockChart', {
+            chart: {
+                type: 'column'
+            },
+            title: {
+                text: 'Stock Levels'
+            },
+            xAxis: {
+                type: 'category'
+            },
+            yAxis: {
+                title: {
+                    text: 'Quantity'
+                }
+            },
+            series: [{
+                name: 'Stock',
+                data: []
+            }]
+        });
+
+        // Fetch initial stocks
+        async function fetchStocks() {
+            const response = await fetch('http://127.0.0.1:8000/api/stocks');
+            const stocks = await response.json();
+            updateChart(stocks);
+        }
+
+        // Update chart function
+        function updateChart(stocks) {
+            const chartData = stocks.map(stock => ({
+                name: stock.product_name,
+                y: stock.quantity
+            }));
+            
+            chart.series[0].setData(chartData);
+        }
+
+        // Listen for stock updates via Pusher
+        channel.bind('.StockUpdated', function(data) {
+            fetchStocks();
+        });
+
+        // Add product form submission
+        document.getElementById('addProductForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const productName = document.getElementById('productName').value;
+            const quantity = document.getElementById('quantity').value;
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/stocks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        product_name: productName,
+                        quantity: quantity
+                    })
+                });
+
+                if (response.ok) {
+                    document.getElementById('productName').value = '';
+                    document.getElementById('quantity').value = '';
+                    fetchStocks();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        });
+
+        // Delete product form submission
+        document.getElementById('deleteProductForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const productName = document.getElementById('deleteProductName').value;
+
+    try {
+        // Étape 1 : Récupérer l'ID du produit par son nom
+        const response = await fetch(`http://127.0.0.1:8000/api/stocks`);
+        const stocks = await response.json();
+        const product = stocks.find(stock => stock.product_name === productName);
+
+        if (!product) {
+            alert("Produit non trouvé !");
+            return;
+        }
+
+        // Étape 2 : Supprimer le produit en utilisant son ID
+        const deleteResponse = await fetch(`http://127.0.0.1:8000/api/stocks/${product.id}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        if (deleteResponse.ok) {
+            document.getElementById('deleteProductName').value = '';
+            fetchStocks(); // Rafraîchir le graphique
+        } else {
+            alert("Erreur lors de la suppression !");
+        }
+    } catch (error) {
+        console.error('Erreur:', error);
+    }
+});
+        // Initial fetch
+        fetchStocks();
+    </script>
+</body>
+</html>
